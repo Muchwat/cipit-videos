@@ -1,67 +1,117 @@
 <?php
 /**
  * Plugin Name: CIPIT Videos - Perfect Ratio
- * Description: Video grid with pixel-perfect 16:9 iframe scaling. Optimized for Golden Ratio aesthetics and Theme CSS variables. Includes anchored pagination.
- * Version: 2.8
+ * Description: Video grid with YouTube/Vimeo support. Fixed modal layout and Taxonomy Groups.
+ * Version: 3.6
  * Author: Kevin Muchwat
  */
 
 if (!defined('ABSPATH'))
     exit;
 
-// 1. Register Post Type
+// 1. Register Custom Post Type & Taxonomy (Styled like Publications)
 add_action('init', function () {
     register_post_type('cipit_video', [
-        'labels' => ['name' => 'CIPIT Videos', 'singular_name' => 'Video'],
+        'labels' => [
+            'name' => 'CIPIT Videos',
+            'singular_name' => 'Video',
+            'add_new' => 'Add Video Link',
+            'add_new_item' => 'Add New Video Link',
+            'edit_item' => 'Edit Video'
+        ],
         'public' => true,
         'menu_icon' => 'dashicons-video-alt3',
         'supports' => ['title', 'thumbnail', 'editor'],
         'show_in_rest' => true,
     ]);
+
+    register_taxonomy('video_group', 'cipit_video', [
+        'hierarchical' => true,
+        'labels' => ['name' => 'Video Groups', 'singular_name' => 'Group'],
+        'show_admin_column' => true,
+        'show_in_rest' => true,
+    ]);
 });
 
-// 2. Shortcode: [cipit_videos]
+// 2. Admin Meta Box
+add_action('add_meta_boxes', function () {
+    add_meta_box('cipit_video_details', 'Video Source Settings', function ($post) {
+        $url = get_post_meta($post->ID, '_video_youtube_url', true);
+        $hash = get_post_meta($post->ID, '_video_vimeo_hash', true);
+        ?>
+        <div style="margin-bottom: 15px;">
+            <p><strong>Video URL:</strong> (YouTube or Vimeo)</p>
+            <input type="text" name="cipit_video_url_field" value="<?php echo esc_attr($url); ?>" style="width:100%;"
+                placeholder="https://..." />
+        </div>
+        <div>
+            <p><strong>Vimeo Hash ID:</strong> (Optional)</p>
+            <input type="text" name="cipit_video_hash_field" value="<?php echo esc_attr($hash); ?>" style="width:100%;"
+                placeholder="e.g. a1b2c3d4" />
+        </div>
+        <?php
+    }, 'cipit_video', 'normal', 'high');
+});
+
+add_action('save_post', function ($post_id) {
+    if (isset($_POST['cipit_video_url_field']))
+        update_post_meta($post_id, '_video_youtube_url', esc_url_raw($_POST['cipit_video_url_field']));
+    if (isset($_POST['cipit_video_hash_field']))
+        update_post_meta($post_id, '_video_vimeo_hash', sanitize_text_field($_POST['cipit_video_hash_field']));
+});
+
+// 3. Shortcode Implementation
 add_shortcode('cipit_videos', function ($atts) {
     wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
-
     $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
+    $atts = shortcode_atts(['show' => 6, 'order' => 'DESC', 'pagination' => 'true', 'group' => ''], $atts);
 
-    $atts = shortcode_atts([
-        'show' => 6,
-        'order' => 'DESC',
-        'pagination' => 'true',
-        'group' => 'video-grid-section'
-    ], $atts);
-
-    $query = new WP_Query([
+    $args = [
         'post_type' => 'cipit_video',
         'posts_per_page' => intval($atts['show']),
         'paged' => $paged,
         'order' => $atts['order'],
-    ]);
+    ];
+
+    if (!empty($atts['group'])) {
+        $args['tax_query'] = [
+            [
+                'taxonomy' => 'video_group',
+                'field' => 'slug',
+                'terms' => $atts['group'],
+            ]
+        ];
+    }
+
+    $query = new WP_Query($args);
 
     if (!$query->have_posts())
         return '';
-
     ob_start();
     ?>
-    <div id="<?php echo esc_attr($atts['group']); ?>" class="cipit-plugin-wrapper">
+    <div id="video-grid-<?php echo esc_attr($atts['group'] ?: 'all'); ?>" class="cipit-plugin-wrapper">
         <div class="video-grid-layout">
             <?php while ($query->have_posts()):
                 $query->the_post();
                 $url = get_post_meta(get_the_ID(), '_video_youtube_url', true);
-                preg_match('%(?:youtube(?:-nocookie)?\.com/(?:[^/]+/.+/|(?:v|e(?:mbed)?)/|.*[?&]v=)|youtu\.be/)([^"&?/ ]{11})%i', $url, $match);
-                $embed_id = isset($match[1]) ? $match[1] : '';
-                $embed_url = "https://www.youtube.com/embed/{$embed_id}?controls=1&rel=0&modestbranding=1&showinfo=0&iv_load_policy=3&vq=hd1080";
-                ?>
+                $v_hash = get_post_meta(get_the_ID(), '_video_vimeo_hash', true);
 
+                if (preg_match('%(?:youtube(?:-nocookie)?\.com/(?:[^/]+/.+/|(?:v|e(?:mbed)?)/|.*[?&]v=)|youtu\.be/)([^"&?/ ]{11})%i', $url, $match)) {
+                    $e_id = $match[1];
+                    $e_url = "https://www.youtube.com/embed/{$e_id}?controls=1&rel=0&modestbranding=1&vq=hd1080";
+                    $t_url = "https://img.youtube.com/vi/{$e_id}/maxresdefault.jpg";
+                } elseif (preg_match('%vimeo\.com/(?:video/|)(\d+)%i', $url, $match)) {
+                    $e_url = "https://player.vimeo.com/video/{$match[1]}?badge=0" . (!empty($v_hash) ? "&h=$v_hash" : "");
+                    $t_url = "https://via.placeholder.com/640x360.png?text=Vimeo+Video";
+                }
+                ?>
                 <article class="video-card">
                     <div class="video-thumb-wrapper"
-                        onclick="openCipitModal('<?php echo esc_url($embed_url); ?>', '<?php echo esc_attr(get_the_title()); ?>', `<?php echo addslashes(get_the_content()); ?>`)">
-                        <?php if (has_post_thumbnail()): ?>
-                            <?php the_post_thumbnail('large', ['class' => 'grid-thumb']); ?>
-                        <?php else: ?>
-                            <img src="https://img.youtube.com/vi/<?php echo $embed_id; ?>/maxresdefault.jpg" class="grid-thumb">
+                        onclick="openCipitModal('<?php echo esc_url($e_url); ?>', '<?php echo esc_attr(get_the_title()); ?>', `<?php echo addslashes(get_the_content()); ?>`)">
+                        <?php if (has_post_thumbnail()):
+                            the_post_thumbnail('large', ['class' => 'grid-thumb']);
+                        else: ?>
+                            <img src="<?php echo esc_url($t_url); ?>" class="grid-thumb">
                         <?php endif; ?>
                         <div class="thumb-hover-overlay"><i class="fa-solid fa-play"></i></div>
                     </div>
@@ -70,14 +120,12 @@ add_shortcode('cipit_videos', function ($atts) {
                             <?php the_title(); ?>
                         </h3>
                         <button class="view-more-btn"
-                            onclick="openCipitModal('<?php echo esc_url($embed_url); ?>', '<?php echo esc_attr(get_the_title()); ?>', `<?php echo addslashes(get_the_content()); ?>`)">
-                            View More <span>→</span>
-                        </button>
+                            onclick="openCipitModal('<?php echo esc_url($e_url); ?>', '<?php echo esc_attr(get_the_title()); ?>', `<?php echo addslashes(get_the_content()); ?>`)">View
+                            More <span>→</span></button>
                     </div>
                 </article>
             <?php endwhile; ?>
         </div>
-
         <?php if ($atts['pagination'] === 'true'): ?>
             <div class="pagination">
                 <?php echo paginate_links([
@@ -86,8 +134,7 @@ add_shortcode('cipit_videos', function ($atts) {
                     'format' => '?paged=%#%',
                     'prev_text' => '<i class="fa-solid fa-angle-left"></i>',
                     'next_text' => '<i class="fa-solid fa-angle-right"></i>',
-                    'type' => 'plain',
-                    'add_fragment' => '#' . esc_attr($atts['group'])
+                    'add_fragment' => '#video-grid-' . esc_attr($atts['group'] ?: 'all')
                 ]); ?>
             </div>
         <?php endif; ?>
@@ -99,7 +146,8 @@ add_shortcode('cipit_videos', function ($atts) {
             <div class="cipit-modal-body">
                 <div class="modal-video-side">
                     <div class="video-ratio-lock">
-                        <iframe id="modalIframe" src="" frameborder="0" allowfullscreen></iframe>
+                        <iframe id="modalIframe" src="" frameborder="0" allow="autoplay; fullscreen"
+                            allowfullscreen></iframe>
                     </div>
                 </div>
                 <div class="modal-info-side">
@@ -116,17 +164,15 @@ add_shortcode('cipit_videos', function ($atts) {
         function openCipitModal(url, title, content) {
             const modal = document.getElementById('cipitVideoModal');
             const iframe = document.getElementById('modalIframe');
-            iframe.src = url + "&autoplay=1";
+            iframe.src = url + (url.includes('?') ? '&' : '?') + "autoplay=1";
             document.getElementById('modalTitle').innerText = title;
             document.getElementById('modalContent').innerHTML = content;
             modal.style.display = 'flex';
             document.body.style.overflow = 'hidden';
         }
-
         function closeCipitModal() {
-            const modal = document.getElementById('cipitVideoModal');
+            document.getElementById('cipitVideoModal').style.display = 'none';
             document.getElementById('modalIframe').src = "";
-            modal.style.display = 'none';
             document.body.style.overflow = 'auto';
         }
     </script>
@@ -147,7 +193,6 @@ add_shortcode('cipit_videos', function ($atts) {
         .video-card {
             display: flex;
             flex-direction: column;
-            transition: var(--card-transition);
         }
 
         .video-thumb-wrapper {
@@ -155,9 +200,9 @@ add_shortcode('cipit_videos', function ($atts) {
             cursor: pointer;
             border-radius: var(--border-radius);
             overflow: hidden;
-            aspect-ratio: 16 / 9;
+            aspect-ratio: 16/9;
             background: #000;
-            border: 1px solid rgba(0, 0, 0, 0.05);
+            border: 1px solid #eee;
             box-shadow: var(--card-shadow);
         }
 
@@ -166,10 +211,11 @@ add_shortcode('cipit_videos', function ($atts) {
             height: 100%;
             object-fit: cover;
             transition: transform 0.5s ease;
+            transform: scale(1.05);
         }
 
         .video-thumb-wrapper:hover .grid-thumb {
-            transform: scale(1.05);
+            transform: scale(1.1);
         }
 
         .thumb-hover-overlay {
@@ -194,7 +240,6 @@ add_shortcode('cipit_videos', function ($atts) {
             font-weight: 700;
             color: var(--primary-color);
             margin: 15px 0 8px 0;
-            line-height: 1.3;
         }
 
         .view-more-btn {
@@ -205,17 +250,9 @@ add_shortcode('cipit_videos', function ($atts) {
             padding: 8px 20px;
             border-radius: var(--button-radius);
             font-size: 0.75rem;
-            font-weight: 600;
             cursor: pointer;
-            transition: var(--card-transition);
         }
 
-        .view-more-btn:hover {
-            background: var(--primary-color);
-            transform: translateY(-2px);
-        }
-
-        /* MODAL STYLING */
         .cipit-modal {
             display: none;
             position: fixed;
@@ -233,40 +270,17 @@ add_shortcode('cipit_videos', function ($atts) {
             width: 95%;
             max-width: 1250px;
             height: 85vh;
-            display: flex;
             position: relative;
             overflow: hidden;
-            border: 1px solid #eee;
-            box-shadow: var(--card-hover-shadow);
-        }
-
-        .modal-close {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            font-size: 2.5rem;
-            color: var(--dark-gray);
-            cursor: pointer;
-            transition: color 0.2s;
-            line-height: 1;
-            background: none;
-            border: none;
-            width: 45px;
-            height: 45px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1001;
-        }
-
-        .modal-close:hover {
-            color: var(--primary-color);
+            display: block;
         }
 
         .cipit-modal-body {
             display: flex;
+            flex-direction: row;
             width: 100%;
             height: 100%;
+            align-items: stretch;
         }
 
         .modal-video-side {
@@ -294,9 +308,9 @@ add_shortcode('cipit_videos', function ($atts) {
 
         .modal-info-side {
             flex: 1;
+            background: #fff;
             border-left: 1px solid #eee;
             position: relative;
-            background: #fff;
         }
 
         .modal-info-scroll {
@@ -306,43 +320,51 @@ add_shortcode('cipit_videos', function ($atts) {
             overflow-y: auto;
         }
 
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 2.5rem;
+            color: var(--dark-gray);
+            background: none;
+            border: none;
+            cursor: pointer;
+            z-index: 1001;
+        }
+
         #modalTitle {
             color: var(--primary-color);
             font-size: var(--h3-font-size);
             margin-bottom: 1.5rem;
             font-weight: 700;
-            line-height: 1.2;
         }
 
         .modal-text-body {
             font-size: 1.05rem;
-            line-height: var(--gr, 1.618);
+            line-height: 1.618;
             color: #555;
             text-align: justify;
         }
 
-        /* RESPONSIVE STACKING */
         @media (max-width: 1024px) {
             .video-grid-layout {
                 grid-template-columns: repeat(2, 1fr);
             }
 
-            .cipit-modal-content {
+            .cipit-modal-body {
                 flex-direction: column;
-                height: 90vh;
                 overflow-y: auto;
             }
 
             .modal-video-side {
                 flex: none;
                 width: 100%;
-                aspect-ratio: 16 / 9;
+                aspect-ratio: 16/9;
             }
 
             .modal-info-side {
-                border-left: none;
-                border-top: 1px solid #eee;
                 flex: none;
+                border-left: none;
             }
 
             .modal-info-scroll {
