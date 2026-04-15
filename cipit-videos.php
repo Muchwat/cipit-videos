@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: CIPIT Videos - Perfect Ratio
+ * Plugin Name: CIPIT Videos
  * Description: Video grid with YouTube/Vimeo support. Fixed modal layout and Taxonomy Groups.
  * Version: 3.6
  * Author: Kevin Muchwat
