@@ -62,7 +62,6 @@ add_action('save_post', function ($post_id) {
 
 // 3. Shortcode Implementation
 add_shortcode('cipit_videos', function ($atts) {
-    wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
     $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
     $atts = shortcode_atts(['show' => 6, 'order' => 'DESC', 'pagination' => 'true', 'group' => ''], $atts);
 
