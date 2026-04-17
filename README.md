@@ -38,6 +38,12 @@ You can customize the grid output using these parameters:
 ```php
 [cipit_videos show="9" order="ASC" group="home-gallery"]
 ```
+### How to use ID Selection:
+Specific IDs only: ```php [cipit_videos show-ids="12,45,88"]```
+
+IDs within a group: ```php [cipit_videos group="home-gallery" show-ids="1,3,4"]```
+
+Standard usage: ```php [cipit_videos show="9" group="home-gallery"]``` (The ID logic will stay idle if the attribute is not used).
 
 ## 3. Managing Videos
 
