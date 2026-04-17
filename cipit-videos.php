@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: CIPIT Videos
- * Description: Video grid with YouTube/Vimeo support. Fixed modal layout and Taxonomy Groups.
- * Version: 3.7
+ * Description: Video grid with YouTube/Vimeo support. Supports specific ID fetching, Golden Ratio modal, and Taxonomy Groups.
+ * Version: 3.8
  * Author: Kevin Muchwat
  */
 
@@ -49,6 +49,9 @@ add_action('add_meta_boxes', function () {
             <input type="text" name="cipit_video_hash_field" value="<?php echo esc_attr($hash); ?>" style="width:100%;"
                 placeholder="e.g. a1b2c3d4" />
         </div>
+        <div style="margin-top:10px; font-style: italic; font-size: 12px; color: #666;">
+            ID for this post: <strong><?php echo $post->ID; ?></strong> (Use this in [cipit_videos show-ids="..."])
+        </div>
         <?php
     }, 'cipit_video', 'normal', 'high');
 });
@@ -63,7 +66,15 @@ add_action('save_post', function ($post_id) {
 // 3. Shortcode Implementation
 add_shortcode('cipit_videos', function ($atts) {
     $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
-    $atts = shortcode_atts(['show' => 6, 'order' => 'DESC', 'pagination' => 'true', 'group' => ''], $atts);
+
+    // Updated attributes to include show-ids
+    $atts = shortcode_atts([
+        'show' => 6,
+        'order' => 'DESC',
+        'pagination' => 'true',
+        'group' => '',
+        'show-ids' => ''
+    ], $atts);
 
     $args = [
         'post_type' => 'cipit_video',
@@ -72,8 +83,22 @@ add_shortcode('cipit_videos', function ($atts) {
         'order' => $atts['order'],
     ];
 
+    // Filter by IDs if provided
+    if (!empty($atts['show-ids'])) {
+        $ids_array = array_map('intval', explode(',', $atts['show-ids']));
+        $args['post__in'] = $ids_array;
+        $args['orderby'] = 'post__in'; // Maintains the sequence provided in the shortcode
+    }
+
+    // Filter by Category/Group
     if (!empty($atts['group'])) {
-        $args['tax_query'] = [['taxonomy' => 'video_group', 'field' => 'slug', 'terms' => $atts['group']]];
+        $args['tax_query'] = [
+            [
+                'taxonomy' => 'video_group',
+                'field' => 'slug',
+                'terms' => $atts['group']
+            ]
+        ];
     }
 
     $query = new WP_Query($args);
@@ -126,14 +151,14 @@ add_shortcode('cipit_videos', function ($atts) {
             <?php endwhile; ?>
         </div>
 
-        <?php if ($atts['pagination'] === 'true'): ?>
+        <?php if ($atts['pagination'] === 'true' && empty($atts['show-ids'])): ?>
             <div class="pagination">
                 <?php echo paginate_links([
                     'total' => $query->max_num_pages,
                     'current' => $paged,
                     'format' => '?paged=%#%',
-                    'prev_text' => '<i class="fa-solid fa-angle-left"></i>',
-                    'next_text' => '<i class="fa-solid fa-angle-right"></i>',
+                    'prev_text' => '&laquo;',
+                    'next_text' => '&raquo;',
                     'add_fragment' => '#' . esc_attr($atts['group'] ?: 'all')
                 ]); ?>
             </div>
@@ -164,6 +189,7 @@ add_shortcode('cipit_videos', function ($atts) {
         function openCipitModal(url, title, content) {
             const modal = document.getElementById('cipitVideoModal');
             const iframe = document.getElementById('modalIframe');
+            if (!url) return;
             iframe.src = url + (url.includes('?') ? '&' : '?') + "autoplay=1";
             document.getElementById('modalTitle').innerText = title;
             document.getElementById('modalContent').innerHTML = content;
@@ -175,7 +201,6 @@ add_shortcode('cipit_videos', function ($atts) {
             document.getElementById('modalIframe').src = "";
             document.body.style.overflow = 'auto';
         }
-        // Close on outside click
         window.onclick = function (event) {
             if (event.target == document.getElementById('cipitVideoModal')) closeCipitModal();
         }
@@ -218,11 +243,12 @@ add_shortcode('cipit_videos', function ($atts) {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            transform: scale(1.08);
             transition: transform 0.5s ease;
         }
 
         .video-thumb-wrapper:hover .grid-thumb {
-            transform: scale(1.08);
+            transform: scale(1.16);
         }
 
         .thumb-hover-overlay {
