@@ -89,24 +89,29 @@ add_shortcode('cipit_videos', function ($atts) {
     }
 
     if (!empty($atts['group'])) {
-        $args['tax_query'] = [[
-            'taxonomy' => 'video_group',
-            'field' => 'slug',
-            'terms' => $atts['group']
-        ]];
+        $args['tax_query'] = [
+            [
+                'taxonomy' => 'video_group',
+                'field' => 'slug',
+                'terms' => $atts['group']
+            ]
+        ];
     }
 
     $query = new WP_Query($args);
-    if (!$query->have_posts()) return '';
+    if (!$query->have_posts())
+        return '';
 
     ob_start();
     ?>
     <div id="video-grid-<?php echo esc_attr($atts['group'] ?: 'all'); ?>" class="cipit-plugin-wrapper">
         <div class="video-grid-layout">
-            <?php while ($query->have_posts()): $query->the_post();
+            <?php while ($query->have_posts()):
+                $query->the_post();
                 $url = get_post_meta(get_the_ID(), '_video_youtube_url', true);
                 $v_hash = get_post_meta(get_the_ID(), '_video_vimeo_hash', true);
-                $e_url = ''; $t_url = '';
+                $e_url = '';
+                $t_url = '';
 
                 if (preg_match('%(?:youtube(?:-nocookie)?\.com/(?:[^/]+/.+/|(?:v|e(?:mbed)?)/|.*[?&]v=)|youtu\.be/)([^"&?/ ]{11})%i', $url, $match)) {
                     $e_id = $match[1];
@@ -154,18 +159,82 @@ add_shortcode('cipit_videos', function ($atts) {
     </div>
 
     <style>
-        :root { --golden-ratio: 1.618; }
-        .cipit-plugin-wrapper { margin: 2rem 0; scroll-margin-top: 120px; }
-        .video-grid-layout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-bottom: 40px; }
-        .video-thumb-wrapper { position: relative; cursor: pointer; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; background: #000; border: 1px solid #eee; }
-        .grid-thumb { width: 100%; height: 100%; object-fit: cover; transform: scale(1.08); transition: transform 0.5s ease; }
-        .video-thumb-wrapper:hover .grid-thumb { transform: scale(1.16); }
-        .thumb-hover-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: .8; transition: opacity 0.3s ease; color: #c02126; font-size: 35px; }
-        .video-thumb-wrapper:hover .thumb-hover-overlay { opacity: 1; background: rgba(192, 33, 38, 0.4); color: #fff; }
-        .video-card-title { font-size: .8rem; font-weight: 700; color: #c02126; margin: 15px 0 8px 0; line-height: 1.3; }
+        :root {
+            --golden-ratio: 1.618;
+        }
 
-        @media (max-width: 1024px) { .video-grid-layout { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 600px) { .video-grid-layout { grid-template-columns: 1fr; } }
+        .cipit-plugin-wrapper {
+            margin: 2rem 0;
+            scroll-margin-top: 120px;
+        }
+
+        .video-grid-layout {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .video-thumb-wrapper {
+            position: relative;
+            cursor: pointer;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            background: #000;
+            border: 1px solid #eee;
+            box-shadow: var(--card-shadow);
+        }
+
+        .grid-thumb {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scale(1.08);
+            transition: transform 0.5s ease;
+        }
+
+        .video-thumb-wrapper:hover .grid-thumb {
+            transform: scale(1.16);
+        }
+
+        .thumb-hover-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: .8;
+            transition: opacity 0.3s ease;
+            color: #c02126;
+            font-size: 35px;
+        }
+
+        .video-thumb-wrapper:hover .thumb-hover-overlay {
+            opacity: 1;
+            background: rgba(192, 33, 38, 0.4);
+            color: #fff;
+        }
+
+        .video-card-title {
+            font-size: .8rem;
+            font-weight: 700;
+            color: #c02126;
+            margin: 15px 0 8px 0;
+            line-height: 1.3;
+        }
+
+        @media (max-width: 1024px) {
+            .video-grid-layout {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .video-grid-layout {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
     <?php
     wp_reset_postdata();
@@ -173,7 +242,7 @@ add_shortcode('cipit_videos', function ($atts) {
 });
 
 // 4. Global Footer Assets (Fixes the duplicate ID and hidden modal issues)
-add_action('wp_footer', function() {
+add_action('wp_footer', function () {
     ?>
     <div id="cipitVideoModal" class="cipit-modal">
         <div class="cipit-modal-content">
@@ -181,7 +250,8 @@ add_action('wp_footer', function() {
             <div class="cipit-modal-body">
                 <div class="modal-video-side">
                     <div class="video-ratio-lock">
-                        <iframe id="modalIframe" src="" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>
+                        <iframe id="modalIframe" src="" frameborder="0" allow="autoplay; fullscreen"
+                            allowfullscreen></iframe>
                     </div>
                 </div>
                 <div class="modal-info-side">
@@ -202,18 +272,18 @@ add_action('wp_footer', function() {
 
             // Decode content
             const decodedContent = atob(contentBase64);
-            
+
             iframe.src = url + (url.includes('?') ? '&' : '?') + "autoplay=1";
             document.getElementById('modalTitle').innerText = title;
             document.getElementById('modalContent').innerHTML = decodedContent;
-            
+
             modal.style.display = 'flex';
             document.body.style.overflow = 'hidden';
         }
 
         function closeCipitModal() {
             const modal = document.getElementById('cipitVideoModal');
-            if(modal) modal.style.display = 'none';
+            if (modal) modal.style.display = 'none';
             document.getElementById('modalIframe').src = "";
             document.body.style.overflow = 'auto';
         }
@@ -225,22 +295,108 @@ add_action('wp_footer', function() {
     </script>
 
     <style>
-        .cipit-modal { display: none; position: fixed; z-index: 999999; inset: 0; background: rgba(0, 0, 0, 0.85); align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .cipit-modal-content { background: #fff; border-radius: 12px; width: 95%; max-width: 1300px; height: 85vh; position: relative; overflow: hidden; }
-        .cipit-modal-body { display: flex; width: 100%; height: 100%; }
-        .modal-video-side { flex: var(--golden-ratio); background: #000; display: flex; align-items: center; }
-        .modal-info-side { flex: 1; background: #fff; border-left: 1px solid #eee; position: relative; }
-        .video-ratio-lock { width: 100%; position: relative; padding-top: 56.25%; }
-        .video-ratio-lock iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .modal-info-scroll { position: absolute; inset: 0; padding: 40px; overflow-y: auto; }
-        .modal-title { color: #c02126; font-size: 1.25rem; margin-bottom: 15px; }
-        .modal-text-body { font-size: 1rem; line-height: var(--golden-ratio); color: #444; }
-        .modal-close { position: absolute; top: 10px; right: 20px; font-size: 2rem; color: #333; cursor: pointer; z-index: 10; border: none; background: none; }
+        .cipit-modal {
+            display: none;
+            position: fixed;
+            z-index: 999999;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .cipit-modal-content {
+            background: #fff;
+            border-radius: var(--border-radius);
+            width: 95%;
+            max-width: 1300px;
+            height: 85vh;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cipit-modal-body {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        .modal-video-side {
+            flex: var(--golden-ratio);
+            background: #000;
+            display: flex;
+            align-items: center;
+        }
+
+        .modal-info-side {
+            flex: 1;
+            background: #fff;
+            border-left: 1px solid #eee;
+            position: relative;
+        }
+
+        .video-ratio-lock {
+            width: 100%;
+            position: relative;
+            padding-top: 56.25%;
+        }
+
+        .video-ratio-lock iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .modal-info-scroll {
+            position: absolute;
+            inset: 0;
+            padding: 40px;
+            overflow-y: auto;
+        }
+
+        .modal-title {
+            color: #c02126;
+            font-size: 1.25rem;
+            margin-bottom: 15px;
+        }
+
+        .modal-text-body {
+            font-size: 1rem;
+            line-height: var(--golden-ratio);
+            color: #444;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 2rem;
+            color: #333;
+            cursor: pointer;
+            z-index: 10;
+            border: none;
+            background: none;
+        }
 
         @media (max-width: 1024px) {
-            .cipit-modal-body { flex-direction: column; overflow-y: auto; }
-            .modal-video-side, .modal-info-side { flex: none; width: 100%; }
-            .modal-info-scroll { position: relative; padding: 30px 20px; }
+            .cipit-modal-body {
+                flex-direction: column;
+                overflow-y: auto;
+            }
+
+            .modal-video-side,
+            .modal-info-side {
+                flex: none;
+                width: 100%;
+            }
+
+            .modal-info-scroll {
+                position: relative;
+                padding: 30px 20px;
+            }
         }
     </style>
     <?php
