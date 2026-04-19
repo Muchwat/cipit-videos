@@ -300,7 +300,7 @@ add_action('wp_footer', function () {
             position: fixed;
             z-index: 999999;
             inset: 0;
-            background: rgba(0, 0, 0, 0.85);
+            background: rgb(0 0 0 / .6);
             align-items: center;
             justify-content: center;
             backdrop-filter: blur(5px);
@@ -309,9 +309,11 @@ add_action('wp_footer', function () {
         .cipit-modal-content {
             background: #fff;
             border-radius: var(--border-radius);
+            box-shadow: 0 8px 30px rgb(0 0 0 / .3);
             width: 95%;
             max-width: 1300px;
             height: 85vh;
+            animation: slideDown 0.3s ease-out;
             position: relative;
             overflow: hidden;
         }
